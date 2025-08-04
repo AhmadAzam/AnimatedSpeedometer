@@ -16,6 +16,7 @@ struct Speedometer: View {
     @State private var progressAmount: Double = 0
     @State private var currentCanvasSize: CGFloat = 0
     @State private var hasPerformedStartupSweep = false
+    @State private var displayedValue: Double = 0
     
     @ObservedObject var animationManager: SpeedometerAnimationManager
     
@@ -74,18 +75,18 @@ struct Speedometer: View {
         .aspectRatio(1, contentMode: .fit)
         .overlay(alignment: .bottom) {
             // Value display overlay
-            Text(SpeedometerFormatter.formatDisplayValue(value))
+            Text(SpeedometerFormatter.formatDisplayValue(displayedValue))
                 .font(.system(.title2, design: .rounded).weight(.medium))
                 .foregroundStyle(.meterReadingClr)
                 .multilineTextAlignment(.center)
                 .contentTransition(.numericText())
-                .animation(.bouncy(duration: 0.6), value: value)
                 .padding(.bottom, dynamicTextPadding)
         }
         .onChange(of: value) { _, newValue in
             updateSpeedometer(to: newValue)
         }
         .onAppear {
+            displayedValue = value
             if !hasPerformedStartupSweep {
                 performStartupSweep()
             } else {
@@ -100,12 +101,17 @@ struct Speedometer: View {
     
     private func performStartupSweep() {
         hasPerformedStartupSweep = true
+        displayedValue = 0 // Start from zero for startup sweep
         
         animationManager.performStartupSweep(
             onStateChange: { progressAmount, needleAngle in
+                // Calculate display value based on progress
+                let sweepValue = progressAmount * self.maxValue
+                
                 withAnimation(.interpolatingSpring(stiffness: 150, damping: 30)) {
                     self.progressAmount = progressAmount
                     self.needleAngle = needleAngle
+                    self.displayedValue = sweepValue
                 }
             },
             onComplete: {
@@ -288,6 +294,11 @@ struct Speedometer: View {
         let clampedValue = min(newValue, maxValue)
         let segmentProgress = calculateNonLinearProgress(for: clampedValue)
         let targetAngle = SpeedometerConfiguration.startAngle + (segmentProgress * SpeedometerConfiguration.totalAngle)
+        
+        // Start counting animation for digital display using animation manager
+        animationManager.animateCountingValue(from: displayedValue, to: newValue) { currentValue in
+            self.displayedValue = currentValue
+        }
         
         // Use animation manager to handle racing animation and haptics
         animationManager.animateToValue(newValue) { _ in

@@ -13,7 +13,7 @@ struct SpeedometerFormatter {
     
     /// Formats a value for display on the speedometer (center text)
     static func formatDisplayValue(_ value: Double) -> String {
-        if value >= 100_000 {
+        if value > 100_000 {
             return String(format: "%.0fk+", value / 1000)
         } else if value >= 1000 {
             let thousands = value / 1000

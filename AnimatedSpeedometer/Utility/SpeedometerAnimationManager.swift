@@ -14,6 +14,7 @@ class SpeedometerAnimationManager: ObservableObject {
     
     private let animationDuration: TimeInterval
     private var hapticTimer: Timer?
+    private var countingTimer: Timer?
     
     init(animationDuration: TimeInterval = SpeedometerConfiguration.defaultAnimationDuration) {
         self.animationDuration = animationDuration
@@ -21,6 +22,7 @@ class SpeedometerAnimationManager: ObservableObject {
     
     deinit {
         stopRacingHaptics()
+        stopCountingAnimation()
     }
     
     // MARK: - Public Methods
@@ -34,6 +36,34 @@ class SpeedometerAnimationManager: ObservableObject {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration) {
             self.stopRacingHaptics()
+        }
+    }
+    
+    /// Animates the digital display value with smooth counting animation
+    func animateCountingValue(from startValue: Double, to targetValue: Double, onValueUpdate: @escaping (Double) -> Void) {
+        stopCountingAnimation()
+        
+        let duration = animationDuration
+        let startTime = Date()
+        
+        // Create timer for smooth counting animation
+        countingTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { timer in
+            let elapsed = Date().timeIntervalSince(startTime)
+            let progress = min(elapsed / duration, 1.0)
+            
+            let easedProgress = self.easeInOut(progress)
+            let currentValue = startValue + (targetValue - startValue) * easedProgress
+            
+            DispatchQueue.main.async {
+                onValueUpdate(currentValue)
+            }
+            
+            if progress >= 1.0 {
+                timer.invalidate()
+                DispatchQueue.main.async {
+                    onValueUpdate(targetValue)
+                }
+            }
         }
     }
     
@@ -59,7 +89,7 @@ class SpeedometerAnimationManager: ObservableObject {
     
     /// Starts continuous racing haptic feedback during normal animations
     private func startRacingHaptics() {
-        stopRacingHaptics() // Stop any existing haptics first
+        stopRacingHaptics()
         isAnimating = true
         
         // Create a timer for continuous haptic pulses
@@ -71,7 +101,7 @@ class SpeedometerAnimationManager: ObservableObject {
     
     /// Starts bouncy haptic feedback for startup sweep
     private func startBouncyHaptics() {
-        stopRacingHaptics() // Stop any existing haptics first
+        stopRacingHaptics() 
         isAnimating = true
         
         // Create a timer for bouncy haptic pulses (faster for startup effect)
@@ -92,5 +122,16 @@ class SpeedometerAnimationManager: ObservableObject {
         hapticTimer?.invalidate()
         hapticTimer = nil
         isAnimating = false
+    }
+    
+    /// Stops counting animation
+    private func stopCountingAnimation() {
+        countingTimer?.invalidate()
+        countingTimer = nil
+    }
+    
+    /// Easing function for smooth counting animation
+    private func easeInOut(_ t: Double) -> Double {
+        return t * t * (3.0 - 2.0 * t)
     }
 }
